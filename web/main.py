@@ -33,7 +33,7 @@ _HTML = """<!DOCTYPE html>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lyvica — Website Scoring</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.17/dist/tailwind.min.css">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     body { font-family: 'Inter', sans-serif; }
@@ -118,7 +118,7 @@ _HTML = """<!DOCTYPE html>
           </label>
           <input type="range" id="min-score" min="0" max="100" value="50" step="5"
             class="w-full accent-indigo-600"
-            oninput="document.getElementById('score-val').textContent = this.value" />
+            oninput="document.getElementById('score-val').textContent = this.value; renderTable();" />
         </div>
         <button id="score-btn" onclick="startScoring()"
           class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-sm font-semibold rounded-lg shadow transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
@@ -201,12 +201,9 @@ _HTML = """<!DOCTYPE html>
 
 <script>
   let activeTab = 'paste';
-  let allLeads = [];
+  let allLeads = [];      // all scored leads, unfiltered
   let completed = 0;
   let total = 0;
-  let hotCount = 0;
-  let warmCount = 0;
-  let qualifiedCount = 0;
 
   function switchTab(tab) {
     activeTab = tab;
@@ -299,9 +296,6 @@ _HTML = """<!DOCTYPE html>
     // Reset state
     allLeads = [];
     completed = 0;
-    hotCount = 0;
-    warmCount = 0;
-    qualifiedCount = 0;
     document.getElementById('results-body').innerHTML = '';
     document.getElementById('error-banner').classList.add('hidden');
     document.getElementById('results-section').classList.add('hidden');
@@ -365,61 +359,45 @@ _HTML = """<!DOCTYPE html>
     }
   }
 
+  function renderTable() {
+    const minScore = parseInt(document.getElementById('min-score').value, 10);
+    const filtered = allLeads
+      .filter(l => (l.rebuild_opportunity_score ?? 0) >= minScore)
+      .sort((a, b) => (b.rebuild_opportunity_score ?? 0) - (a.rebuild_opportunity_score ?? 0));
+    const tbody = document.getElementById('results-body');
+    tbody.innerHTML = '';
+    filtered.forEach((l, i) => addRow(l, i + 1));
+    document.getElementById('stat-total').textContent = completed;
+    document.getElementById('stat-qualified').textContent = filtered.filter(l => l.status === 'qualified' || l.status === 'needs_review').length;
+    document.getElementById('stat-hot').textContent = filtered.filter(l => l.tier === 'hot').length;
+    document.getElementById('stat-warm').textContent = filtered.filter(l => l.tier === 'warm').length;
+  }
+
   function handleEvent(event) {
     if (event.type === 'start') {
       total = event.total;
       document.getElementById('progress-label').textContent = `Scoring ${total} domain${total !== 1 ? 's' : ''}…`;
       document.getElementById('results-section').classList.remove('hidden');
       document.getElementById('stats-section').classList.remove('hidden');
-      updateStats();
     } else if (event.type === 'result') {
       completed++;
       const lead = event.lead;
-      const minScore = parseInt(document.getElementById('min-score').value, 10);
-      const score = lead.rebuild_opportunity_score || 0;
-
-      // Progress (always update for all domains)
+      const score = lead.rebuild_opportunity_score ?? 0;
+      allLeads.push(lead);
       const pct = Math.round((completed / total) * 100);
       document.getElementById('progress-bar').style.width = pct + '%';
       document.getElementById('progress-label').textContent = `Scored ${completed} / ${total}`;
-      document.getElementById('progress-sub').textContent = `Last: ${lead.domain} (${score})`;
-
-      // Skip leads below the min score threshold
-      if (score < minScore) return;
-
-      allLeads.push(lead);
-
-      // Sort and re-rank as we go
-      allLeads.sort((a, b) => (b.rebuild_opportunity_score || 0) - (a.rebuild_opportunity_score || 0));
-
-      // Update stats
-      if (lead.status === 'qualified' || lead.status === 'needs_review') {
-        qualifiedCount++;
-        if (lead.tier === 'hot') hotCount++;
-        if (lead.tier === 'warm') warmCount++;
-      }
-      updateStats();
-
-      // Rebuild table (keep sorted order)
-      const tbody = document.getElementById('results-body');
-      tbody.innerHTML = '';
-      allLeads.forEach((l, i) => addRow(l, i + 1));
-
+      document.getElementById('progress-sub').textContent = `Last: ${lead.domain} — score ${score}`;
+      renderTable();
     } else if (event.type === 'done') {
       document.getElementById('progress-bar').style.width = '100%';
-      const shown = allLeads.length;
-      document.getElementById('progress-label').textContent = `Done — ${shown} of ${completed} domains above score threshold`;
+      const minScore = parseInt(document.getElementById('min-score').value, 10);
+      const shown = allLeads.filter(l => (l.rebuild_opportunity_score ?? 0) >= minScore).length;
+      document.getElementById('progress-label').textContent = `Done — ${shown} of ${completed} domains above threshold`;
       document.getElementById('progress-sub').textContent = '';
     } else if (event.type === 'error') {
       showError(event.message);
     }
-  }
-
-  function updateStats() {
-    document.getElementById('stat-total').textContent = completed;
-    document.getElementById('stat-qualified').textContent = qualifiedCount;
-    document.getElementById('stat-hot').textContent = hotCount;
-    document.getElementById('stat-warm').textContent = warmCount;
   }
 
   function showError(msg) {
