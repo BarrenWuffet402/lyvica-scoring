@@ -1,0 +1,12 @@
+{
+  "job_id": "test-001",
+  "icp": {
+    "technologies": ["wordpress"],
+    "countries": ["US", "GB"],
+    "industries": ["retail"],
+    "company_size": {"min_employees": 5, "max_employees": 200}
+  },
+  "seed_domains": [],
+  "limits": {"max_candidates": 50, "min_score_to_include": 60},
+  "config": {"concurrency": 4}
+}

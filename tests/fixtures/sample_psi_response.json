@@ -1,0 +1,92 @@
+{
+  "kind": "pagespeedonline#result",
+  "captchaResult": "CAPTCHA_NOT_NEEDED",
+  "id": "https://example.com/",
+  "loadingExperience": {
+    "id": "https://example.com/",
+    "metrics": {},
+    "overall_category": "SLOW",
+    "initial_url": "https://example.com/"
+  },
+  "originLoadingExperience": {
+    "id": "https://example.com",
+    "metrics": {},
+    "overall_category": "SLOW",
+    "initial_url": "https://example.com/"
+  },
+  "lighthouseResult": {
+    "requestedUrl": "https://example.com/",
+    "finalUrl": "https://example.com/",
+    "lighthouseVersion": "11.0.0",
+    "userAgent": "Mozilla/5.0",
+    "fetchTime": "2024-01-15T12:00:00.000Z",
+    "environment": {
+      "networkUserAgent": "Mozilla/5.0",
+      "hostUserAgent": "Mozilla/5.0",
+      "benchmarkIndex": 1200
+    },
+    "runWarnings": [],
+    "configSettings": {
+      "emulatedFormFactor": "mobile",
+      "formFactor": "mobile",
+      "locale": "en-US",
+      "onlyCategories": ["performance", "accessibility", "seo"]
+    },
+    "categories": {
+      "performance": {
+        "id": "performance",
+        "title": "Performance",
+        "score": 0.42
+      },
+      "accessibility": {
+        "id": "accessibility",
+        "title": "Accessibility",
+        "score": 0.68
+      },
+      "seo": {
+        "id": "seo",
+        "title": "SEO",
+        "score": 0.75
+      }
+    },
+    "audits": {
+      "first-contentful-paint": {
+        "id": "first-contentful-paint",
+        "title": "First Contentful Paint",
+        "description": "First Contentful Paint",
+        "score": 0.3,
+        "numericValue": 4200.5,
+        "numericUnit": "millisecond",
+        "displayValue": "4.2 s"
+      },
+      "largest-contentful-paint": {
+        "id": "largest-contentful-paint",
+        "title": "Largest Contentful Paint",
+        "description": "Largest Contentful Paint",
+        "score": 0.2,
+        "numericValue": 7800.0,
+        "numericUnit": "millisecond",
+        "displayValue": "7.8 s"
+      },
+      "total-blocking-time": {
+        "id": "total-blocking-time",
+        "title": "Total Blocking Time",
+        "description": "Total Blocking Time",
+        "score": 0.4,
+        "numericValue": 650.0,
+        "numericUnit": "millisecond",
+        "displayValue": "650 ms"
+      },
+      "cumulative-layout-shift": {
+        "id": "cumulative-layout-shift",
+        "title": "Cumulative Layout Shift",
+        "description": "Cumulative Layout Shift",
+        "score": 0.35,
+        "numericValue": 0.285,
+        "numericUnit": "unitless",
+        "displayValue": "0.285"
+      }
+    }
+  },
+  "analysisUTCTimestamp": "2024-01-15T12:00:00.000Z"
+}
