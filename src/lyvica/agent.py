@@ -129,7 +129,10 @@ def _to_domain(raw: str) -> str:
     if not raw.startswith(("http://", "https://")):
         raw = f"https://{raw}"
     parsed = urlparse(raw)
-    return parsed.netloc.lower().lstrip("www.") or raw
+    netloc = parsed.netloc.lower()
+    if netloc.startswith("www."):
+        netloc = netloc[4:]
+    return netloc or raw
 
 
 def _to_url(domain: str) -> str:

@@ -375,6 +375,18 @@ _HTML = """<!DOCTYPE html>
     } else if (event.type === 'result') {
       completed++;
       const lead = event.lead;
+      const minScore = parseInt(document.getElementById('min-score').value, 10);
+      const score = lead.rebuild_opportunity_score || 0;
+
+      // Progress (always update for all domains)
+      const pct = Math.round((completed / total) * 100);
+      document.getElementById('progress-bar').style.width = pct + '%';
+      document.getElementById('progress-label').textContent = `Scored ${completed} / ${total}`;
+      document.getElementById('progress-sub').textContent = `Last: ${lead.domain} (${score})`;
+
+      // Skip leads below the min score threshold
+      if (score < minScore) return;
+
       allLeads.push(lead);
 
       // Sort and re-rank as we go
@@ -388,12 +400,6 @@ _HTML = """<!DOCTYPE html>
       }
       updateStats();
 
-      // Progress
-      const pct = Math.round((completed / total) * 100);
-      document.getElementById('progress-bar').style.width = pct + '%';
-      document.getElementById('progress-label').textContent = `Scored ${completed} / ${total}`;
-      document.getElementById('progress-sub').textContent = `Last: ${lead.domain}`;
-
       // Rebuild table (keep sorted order)
       const tbody = document.getElementById('results-body');
       tbody.innerHTML = '';
@@ -401,7 +407,8 @@ _HTML = """<!DOCTYPE html>
 
     } else if (event.type === 'done') {
       document.getElementById('progress-bar').style.width = '100%';
-      document.getElementById('progress-label').textContent = `Done — ${completed} domain${completed !== 1 ? 's' : ''} scored`;
+      const shown = allLeads.length;
+      document.getElementById('progress-label').textContent = `Done — ${shown} of ${completed} domains above score threshold`;
       document.getElementById('progress-sub').textContent = '';
     } else if (event.type === 'error') {
       showError(event.message);
