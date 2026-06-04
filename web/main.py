@@ -304,7 +304,7 @@ _HTML = """<!DOCTYPE html>
     // Build form data
     const formData = new FormData();
     formData.append('min_score', document.getElementById('min-score').value);
-    formData.append('concurrency', '6');
+    formData.append('concurrency', '3');
 
     if (activeTab === 'paste') {
       const text = document.getElementById('domains-text').value.trim();
@@ -447,7 +447,7 @@ async def score_domains(
     csv_file: Optional[UploadFile] = File(None),
     domains_text: Optional[str] = Form(None),
     min_score: int = Form(50),
-    concurrency: int = Form(6),
+    concurrency: int = Form(3),
 ) -> StreamingResponse:
     """
     Accept domains via CSV upload or pasted text; stream scored leads back as SSE.
