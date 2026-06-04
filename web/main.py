@@ -231,10 +231,6 @@ _HTML = """<!DOCTYPE html>
     document.getElementById('csv-label').textContent = '\\u2713 ' + name;
   }
 
-  document.getElementById('drop-zone').addEventListener('click', () => {
-    document.getElementById('csv-file').click();
-  });
-
   function scoreColor(score) {
     if (score === null || score === undefined) return 'text-slate-400';
     if (score >= 70) return 'text-red-600';
@@ -297,6 +293,8 @@ _HTML = """<!DOCTYPE html>
     allLeads = [];
     completed = 0;
     document.getElementById('results-body').innerHTML = '';
+    document.getElementById('csv-file').value = '';
+    document.getElementById('csv-label').textContent = 'Drop CSV here or <span class="text-indigo-600 font-medium">browse</span>';
     document.getElementById('error-banner').classList.add('hidden');
     document.getElementById('results-section').classList.add('hidden');
     document.getElementById('stats-section').classList.add('hidden');
