@@ -302,6 +302,8 @@ _HTML = """<!DOCTYPE html>
     const industry = document.getElementById('source-industry').value;
     const maxResults = document.getElementById('source-max').value;
 
+    console.log('findBusinesses called', { city, industry, maxResults });
+
     if (!city) { showSourceError('Please enter a city or area.'); return; }
     if (!industry) { showSourceError('Please select an industry.'); return; }
 
@@ -325,6 +327,7 @@ _HTML = """<!DOCTYPE html>
       const data = await resp.json();
       renderSourceResults(data.businesses, data.query);
     } catch (err) {
+      console.error('findBusinesses error:', err);
       showSourceError(err.message);
     } finally {
       btn.disabled = false;
@@ -377,9 +380,11 @@ _HTML = """<!DOCTYPE html>
   }
 
   function showSourceError(msg) {
+    console.warn('Source error:', msg);
     const el = document.getElementById('source-error');
     el.textContent = msg;
     el.classList.remove('hidden');
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function switchTab(tab) {
