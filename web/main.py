@@ -99,15 +99,17 @@ _HTML = """<!DOCTYPE html>
           CSV file — needs a column named <code class="bg-slate-100 px-1 rounded">domain</code>,
           <code class="bg-slate-100 px-1 rounded">url</code>, or <code class="bg-slate-100 px-1 rounded">website</code>
         </label>
-        <label id="drop-zone"
-          class="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl py-10 px-6 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
-          <svg class="w-10 h-10 text-slate-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div id="drop-zone"
+          class="relative flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl py-10 px-6 hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
+          <svg class="w-10 h-10 text-slate-400 mb-3 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
               d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
           </svg>
-          <span id="csv-label" class="text-sm text-slate-500">Drop CSV here or <span class="text-indigo-600 font-medium">browse</span></span>
-          <input type="file" id="csv-file" accept=".csv,text/csv" class="hidden" onchange="onFileSelect(this)" />
-        </label>
+          <span id="csv-label" class="text-sm text-slate-500 pointer-events-none">Drop CSV here or <span class="text-indigo-600 font-medium">browse</span></span>
+          <input type="file" id="csv-file" accept=".csv,text/csv"
+            style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;"
+            onchange="onFileSelect(this)" />
+        </div>
       </div>
 
       <!-- Settings row -->
