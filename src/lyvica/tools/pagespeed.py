@@ -29,7 +29,7 @@ async def run_psi(url: str) -> dict:
         }
     """
     result: dict = {
-        "mobile_score": None,
+        "has_viewport": None,       # bool — viewport meta tag present (mobile-friendliness)
         "performance_score": None,
         "fcp": None,
         "lcp": None,
@@ -71,12 +71,13 @@ async def run_psi(url: str) -> dict:
         audits = lighthouse.get("audits", {})
 
         perf = categories.get("performance", {}).get("score")
-        accessibility = categories.get("accessibility", {}).get("score")
-
         if perf is not None:
             result["performance_score"] = round(perf * 100)
-        if accessibility is not None:
-            result["mobile_score"] = round(accessibility * 100)
+
+        # viewport audit: score 1 = has viewport meta tag, 0 = missing
+        viewport_score = audits.get("viewport", {}).get("score")
+        if viewport_score is not None:
+            result["has_viewport"] = viewport_score == 1
 
         # Core Web Vitals from audits
         def _ms(audit_key: str) -> float | None:

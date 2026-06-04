@@ -147,21 +147,29 @@ def _to_url(domain: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _psi_to_mobile_subscore(mobile_score: Optional[float]) -> Optional[float]:
+def _psi_to_mobile_subscore(has_viewport: Optional[bool]) -> Optional[float]:
     """
-    Convert PSI accessibility score (0–100) to a mobile-friendliness *problem* score (0–100).
-    Low accessibility score → high problem score.
+    No viewport meta tag = definitely not mobile-friendly = 100.
+    Has viewport tag = can't tell from this alone, skip signal (None).
+    This avoids falsely rewarding old sites that happen to have good accessibility scores.
     """
-    if mobile_score is None:
+    if has_viewport is None:
         return None
-    return round(100.0 - mobile_score, 2)
+    return 0.0 if has_viewport else 100.0
 
 
 def _psi_to_performance_subscore(perf_score: Optional[float]) -> Optional[float]:
-    """Convert PSI performance score to a performance-problem score (inverted)."""
+    """
+    Only penalise genuinely slow sites (PSI score < 50).
+    Sites scoring >= 50 return None — fast old sites shouldn't get credit
+    for loading quickly just because they have no JS/CSS.
+    Mapping: score 0 → problem 100, score 49 → problem 2.
+    """
     if perf_score is None:
         return None
-    return round(100.0 - perf_score, 2)
+    if perf_score >= 50:
+        return None
+    return round((50.0 - perf_score) * 2.0, 2)
 
 
 def _ssl_to_security_subscore(
@@ -433,7 +441,7 @@ class LyvicaAgent:
             https=ssl_result.get("https"),
             mixed_content=ssl_result.get("mixed_content"),
             viewport_meta=html_signals.get("viewport_meta"),
-            pagespeed_mobile=psi_result.get("mobile_score"),
+            pagespeed_mobile=psi_result.get("performance_score"),
             pagespeed_performance=psi_result.get("performance_score"),
             last_significant_change=last_change_iso,
             footer_copyright_year=footer_year,
@@ -469,7 +477,7 @@ class LyvicaAgent:
         )
 
         subscores = Subscores(
-            mobile=_psi_to_mobile_subscore(psi_result.get("mobile_score")),
+            mobile=_psi_to_mobile_subscore(psi_result.get("has_viewport")),
             visual_datedness=visual_score,
             tech_obsolescence=tech_obs if tech_obs > 0 else None,
             performance=_psi_to_performance_subscore(psi_result.get("performance_score")),
