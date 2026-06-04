@@ -295,8 +295,6 @@ _HTML = """<!DOCTYPE html>
     allLeads = [];
     completed = 0;
     document.getElementById('results-body').innerHTML = '';
-    document.getElementById('csv-file').value = '';
-    document.getElementById('csv-label').innerHTML = 'Drop CSV here or <span class="text-indigo-600 font-medium">browse</span>';
     document.getElementById('error-banner').classList.add('hidden');
     document.getElementById('results-section').classList.add('hidden');
     document.getElementById('stats-section').classList.add('hidden');
