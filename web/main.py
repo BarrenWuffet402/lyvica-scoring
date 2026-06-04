@@ -326,6 +326,7 @@ _HTML = """<!DOCTYPE html>
         throw new Error(err.detail || 'Search failed');
       }
       const data = await resp.json();
+      console.log('source response', data);
       renderSourceResults(data.businesses, data.query);
     } catch (err) {
       console.error('findBusinesses error:', err);
