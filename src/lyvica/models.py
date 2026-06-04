@@ -110,6 +110,7 @@ class Lead(BaseModel):
     subscores: Subscores
     evidence: Evidence
     pitch_angles: list[str]
+    summary: str = ""
     contact: Optional[Contact] = None
     compliance: Compliance
 

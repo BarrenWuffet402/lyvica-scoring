@@ -270,7 +270,7 @@ _HTML = """<!DOCTYPE html>
             <th class="px-4 py-3 text-left font-medium">CMS</th>
             <th class="px-4 py-3 text-center font-medium">HTTPS</th>
             <th class="px-4 py-3 text-center font-medium">Mobile</th>
-            <th class="px-4 py-3 text-left font-medium">Top Signal</th>
+            <th class="px-4 py-3 text-left font-medium">Summary</th>
           </tr>
         </thead>
         <tbody id="results-body" class="divide-y divide-slate-100"></tbody>
@@ -442,16 +442,17 @@ _HTML = """<!DOCTYPE html>
   function addRow(lead, rank) {
     const tbody = document.getElementById('results-body');
     const score = lead.rebuild_opportunity_score;
-    const pitchAngle = (lead.pitch_angles && lead.pitch_angles.length > 0)
-      ? lead.pitch_angles[0]
-      : (lead.status === 'disqualified' ? '<em class="text-slate-400">disqualified</em>' : '—');
     const mobileScore = lead.evidence?.pagespeed_mobile;
     const mobileDisplay = mobileScore !== null && mobileScore !== undefined
       ? `<span class="${mobileScore < 50 ? 'text-red-500' : mobileScore < 80 ? 'text-amber-500' : 'text-emerald-600'}">${Math.round(mobileScore)}</span>`
       : '<span class="text-slate-300">—</span>';
 
+    const summary = lead.summary || '';
+    const summaryId = `summary-row-${rank}`;
+
     const tr = document.createElement('tr');
-    tr.className = 'hover:bg-slate-50 transition-colors fade-in';
+    tr.className = 'hover:bg-slate-50 transition-colors fade-in cursor-pointer';
+    tr.title = 'Click to expand summary';
     tr.innerHTML = `
       <td class="px-4 py-3 text-slate-400 text-xs font-mono">${rank}</td>
       <td class="px-4 py-3">
@@ -467,9 +468,27 @@ _HTML = """<!DOCTYPE html>
       <td class="px-4 py-3 text-xs text-slate-600">${lead.evidence?.cms || '<span class="text-slate-300">—</span>'}</td>
       <td class="px-4 py-3 text-center">${httpsIcon(lead.evidence?.https)}</td>
       <td class="px-4 py-3 text-center text-xs">${mobileDisplay}</td>
-      <td class="px-4 py-3 text-xs text-slate-600 max-w-xs">${pitchAngle}</td>
+      <td class="px-4 py-3 text-xs text-slate-500 max-w-xs truncate">
+        ${summary ? `<span class="text-slate-400 mr-1">▶</span>${summary.slice(0, 80)}…` : '<span class="text-slate-300">—</span>'}
+      </td>
     `;
+
+    const summaryRow = document.createElement('tr');
+    summaryRow.id = summaryId;
+    summaryRow.className = 'hidden bg-indigo-50 border-l-4 border-indigo-400';
+    summaryRow.innerHTML = `
+      <td colspan="8" class="px-6 py-4 text-sm text-slate-700 leading-relaxed">${summary}</td>
+    `;
+
+    tr.onclick = (e) => {
+      if (e.target.tagName === 'A') return;
+      summaryRow.classList.toggle('hidden');
+      const arrow = tr.querySelector('span.text-slate-400');
+      if (arrow) arrow.textContent = summaryRow.classList.contains('hidden') ? '▶' : '▼';
+    };
+
     tbody.appendChild(tr);
+    tbody.appendChild(summaryRow);
   }
 
   async function startScoring() {

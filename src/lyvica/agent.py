@@ -118,6 +118,148 @@ def _generate_pitch_angles(
     return angles
 
 
+def _generate_summary(
+    domain: str,
+    score: Optional[float],
+    tier: Optional[str],
+    evidence: Evidence,
+    subscores: Subscores,
+) -> str:
+    """
+    Build a concise 1-paragraph prose summary explaining why the site scored as it did.
+    Deterministic — no LLM required. Suitable for downstream outreach agents.
+    """
+    if score is None:
+        return f"{domain} could not be fully evaluated — too many signals failed to return data."
+
+    tier_phrase = {
+        "hot":  "a strong rebuild candidate",
+        "warm": "a moderate rebuild candidate",
+        "cold": "a lower-priority lead",
+    }.get(tier or "", "scored")
+
+    # Build a ranked list of (severity, prose description)
+    issues: list[tuple[float, str]] = []
+    positives: list[str] = []
+
+    # Mobile
+    if subscores.mobile is not None:
+        if subscores.mobile >= 100:
+            issues.append((subscores.mobile,
+                "the site has no mobile viewport tag, meaning it almost certainly breaks on "
+                "smartphones — a critical problem given that the majority of local searches "
+                "now happen on mobile"))
+    else:
+        # Check raw HTML signal
+        if evidence.viewport_meta is False:
+            issues.append((90.0,
+                "no mobile viewport tag was detected, suggesting the site is not responsive"))
+
+    # Security
+    if subscores.security is not None:
+        if subscores.security >= 100:
+            issues.append((subscores.security,
+                "it has no HTTPS — every visitor sees a browser security warning, "
+                "which damages trust and suppresses conversions"))
+        elif subscores.security >= 80:
+            issues.append((subscores.security, "it has an invalid SSL certificate"))
+        elif subscores.security >= 40:
+            issues.append((subscores.security, "it serves mixed HTTP/HTTPS content"))
+        else:
+            positives.append("runs over HTTPS")
+
+    # Tech obsolescence
+    if subscores.tech_obsolescence is not None and subscores.tech_obsolescence > 0:
+        cms = evidence.cms or ""
+        ver = evidence.cms_version or ""
+        techs = evidence.detected_technologies or []
+        if subscores.tech_obsolescence >= 80:
+            if cms and ver:
+                issues.append((subscores.tech_obsolescence,
+                    f"it runs {cms} {ver}, an end-of-life platform with known "
+                    "security vulnerabilities and no vendor support"))
+            elif techs:
+                issues.append((subscores.tech_obsolescence,
+                    f"it is built on {techs[0]}, an outdated technology that is a "
+                    "maintenance burden and security liability"))
+            else:
+                issues.append((subscores.tech_obsolescence,
+                    "it uses obsolete web technology"))
+        elif subscores.tech_obsolescence >= 60:
+            if cms and ver:
+                issues.append((subscores.tech_obsolescence,
+                    f"it runs {cms} {ver}, an ageing platform that is falling "
+                    "behind on modern web standards"))
+            else:
+                issues.append((subscores.tech_obsolescence,
+                    "it uses a dated tech stack"))
+    elif subscores.tech_obsolescence == 0:
+        positives.append("uses a modern tech stack")
+
+    # Content freshness
+    if subscores.content_freshness is not None and subscores.content_freshness >= 40:
+        if evidence.last_significant_change:
+            year = evidence.last_significant_change[:4]
+            issues.append((subscores.content_freshness,
+                f"content has not meaningfully changed since {year}"))
+        elif evidence.footer_copyright_year:
+            issues.append((subscores.content_freshness,
+                f"the footer still shows a {evidence.footer_copyright_year} "
+                "copyright date, suggesting the site has been left to stagnate"))
+        else:
+            issues.append((subscores.content_freshness,
+                "content appears significantly out of date based on archived snapshots"))
+
+    # Performance (only present when < 50 on Lighthouse)
+    if subscores.performance is not None and subscores.performance >= 50:
+        issues.append((subscores.performance,
+            "it loads slowly on mobile devices, which hurts both user experience "
+            "and Google search rankings"))
+
+    # SEO
+    if subscores.seo_hygiene is not None and subscores.seo_hygiene >= 66:
+        missing = []
+        if evidence.open_graph is False:
+            missing.append("Open Graph tags")
+        if evidence.schema_org is False:
+            missing.append("structured data markup")
+        if not missing:
+            missing.append("key SEO metadata")
+        issues.append((subscores.seo_hygiene,
+            f"it is missing {' and '.join(missing)}, reducing its visibility "
+            "in search results and social sharing"))
+
+    issues.sort(key=lambda x: x[0], reverse=True)
+
+    # --- Assemble paragraph ---
+    if not issues:
+        positive_note = (
+            f" Positives include: {'; '.join(positives)}." if positives else ""
+        )
+        return (
+            f"{domain} scores {int(score)}/100 and is {tier_phrase}.{positive_note} "
+            "No single signal stands out as a critical problem."
+        )
+
+    # Opening: domain + score + top issue
+    opening = (
+        f"{domain} scores {int(score)}/100 and is {tier_phrase} — {issues[0][1]}."
+    )
+
+    # Body: next up to 2 issues
+    body_sentences = []
+    for _, desc in issues[1:3]:
+        body_sentences.append(desc[0].upper() + desc[1:] + ".")
+
+    # Closing: positives
+    closing = ""
+    if positives:
+        closing = f" On the positive side, it {positives[0]}."
+
+    parts = [opening] + body_sentences
+    return " ".join(parts) + closing
+
+
 # ---------------------------------------------------------------------------
 # Domain normalization helpers
 # ---------------------------------------------------------------------------
@@ -493,8 +635,9 @@ class LyvicaAgent:
         # ── Step 9: Score and tier ─────────────────────────────────────
         score, tier, confidence = score_lead(subscores)
 
-        # ── Step 10: Pitch angles ──────────────────────────────────────
+        # ── Step 10: Pitch angles + summary ───────────────────────────
         pitch_angles = _generate_pitch_angles(evidence, subscores)
+        summary = _generate_summary(domain, score, tier, evidence, subscores)
 
         # ── Step 11: Determine status ──────────────────────────────────
         # If we have no HTML and no PSI data, flag for review
@@ -526,6 +669,7 @@ class LyvicaAgent:
             subscores=subscores,
             evidence=evidence,
             pitch_angles=pitch_angles,
+            summary=summary,
             contact=None,
             compliance=compliance,
         )
