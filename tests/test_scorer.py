@@ -87,59 +87,57 @@ class TestScoreLead:
         assert tier == "warm"
 
     def test_two_null_subscores_caps_tier(self):
-        """Two null subscores → tier capped at warm even if score >= 70."""
+        """Two null subscores → tier capped at warm even if normalized score >= 70."""
         subscores = Subscores(
             mobile=100.0,
             visual_datedness=100.0,
             tech_obsolescence=100.0,
             performance=100.0,
             security=100.0,
-            content_freshness=None,   # null
-            seo_hygiene=None,          # null
+            content_freshness=None,
+            seo_hygiene=None,
         )
         score, tier, confidence = score_lead(subscores)
-        # Score without two fields: 0.20*100 + 0.20*100 + 0.20*100 + 0.15*100 + 0.10*100 = 85
+        # Normalized: all measured at 100 → score = 100
         assert score >= 70
-        # Tier must be capped at warm
         assert tier == "warm"
-        # Confidence formula: 0.4 + (5/7)*0.4
-        expected_conf = 0.4 + (5 / 7) * 0.4
-        assert confidence == pytest.approx(expected_conf, abs=0.001)
+        # confidence = measured_weight = 0.20+0.20+0.20+0.15+0.10 = 0.85
+        assert confidence == pytest.approx(0.85, abs=0.001)
 
     def test_two_null_subscores_confidence_formula(self):
-        """With exactly 2 nulls, confidence = 0.4 + (non_null/7)*0.4."""
+        """Confidence equals the sum of weights of measured subscores."""
         subscores = Subscores(
             mobile=50.0,
-            visual_datedness=None,
-            tech_obsolescence=None,
+            visual_datedness=None,   # 0.20 missing
+            tech_obsolescence=None,  # 0.20 missing
             performance=50.0,
             security=50.0,
             content_freshness=50.0,
             seo_hygiene=50.0,
         )
         _, _, confidence = score_lead(subscores)
-        expected = 0.4 + (5 / 7) * 0.4
-        assert confidence == pytest.approx(expected, abs=0.001)
+        # measured_weight = 0.20+0.15+0.10+0.10+0.05 = 0.60
+        assert confidence == pytest.approx(0.60, abs=0.001)
 
     def test_three_null_subscores_confidence(self):
-        """Three nulls → confidence further reduced."""
+        """Three nulls → lower measured_weight."""
         subscores = Subscores(
             mobile=50.0,
-            visual_datedness=None,
-            tech_obsolescence=None,
-            performance=None,
+            visual_datedness=None,   # 0.20 missing
+            tech_obsolescence=None,  # 0.20 missing
+            performance=None,        # 0.15 missing
             security=50.0,
             content_freshness=50.0,
             seo_hygiene=50.0,
         )
         _, _, confidence = score_lead(subscores)
-        expected = 0.4 + (4 / 7) * 0.4
-        assert confidence == pytest.approx(expected, abs=0.001)
+        # measured_weight = 0.20+0.10+0.10+0.05 = 0.45
+        assert confidence == pytest.approx(0.45, abs=0.001)
 
-    def test_one_null_subscore_higher_confidence(self):
-        """One null → confidence = 0.6 + (6/7)*0.4 (no cap)."""
+    def test_one_null_subscore_confidence(self):
+        """One null → confidence = sum of remaining weights."""
         subscores = Subscores(
-            mobile=None,
+            mobile=None,             # 0.20 missing
             visual_datedness=50.0,
             tech_obsolescence=50.0,
             performance=50.0,
@@ -148,8 +146,26 @@ class TestScoreLead:
             seo_hygiene=50.0,
         )
         _, _, confidence = score_lead(subscores)
-        expected = 0.6 + (6 / 7) * 0.4
-        assert confidence == pytest.approx(expected, abs=0.001)
+        # measured_weight = 0.20+0.20+0.15+0.10+0.10+0.05 = 0.80
+        assert confidence == pytest.approx(0.80, abs=0.001)
+
+    def test_normalization_partial_signals(self):
+        """Partial signals normalize to same score as if all were measured."""
+        # Only security (0.10) and seo_hygiene (0.05) measured, both at 80
+        subscores = Subscores(
+            mobile=None,
+            visual_datedness=None,
+            tech_obsolescence=None,
+            performance=None,
+            security=80.0,
+            content_freshness=None,
+            seo_hygiene=80.0,
+        )
+        score, _, _ = score_lead(subscores)
+        # measured_weight = 0.10+0.05 = 0.15
+        # weighted_sum = 0.10*80 + 0.05*80 = 12
+        # normalized = 12 / 0.15 = 80
+        assert score == 80.0
 
     def test_tiering_threshold_70_is_hot(self):
         """Score of exactly 70 → hot."""

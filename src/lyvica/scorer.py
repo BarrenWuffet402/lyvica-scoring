@@ -214,20 +214,24 @@ def score_lead(subscores: Subscores) -> tuple[float, str, float]:
     null_count = sum(1 for v in values.values() if v is None)
     non_null = _TOTAL - null_count
 
-    # Weighted sum — treat None as 0
+    # Normalize by the weight of measured subscores only.
+    # Treating null as 0 deflates scores when signals fail — a site where
+    # PSI and vision are unavailable shouldn't score near zero.
+    measured_weight = sum(w for k, w in _WEIGHTS.items() if values[k] is not None)
+
+    if measured_weight == 0:
+        # No signals at all — can't score
+        return 0.0, "cold", 0.0
+
     weighted_sum = sum(
-        _WEIGHTS[k] * (v if v is not None else 0.0)
+        _WEIGHTS[k] * v
         for k, v in values.items()
+        if v is not None
     )
-    score = round(weighted_sum)
+    score = round(weighted_sum / measured_weight)
 
-    # Confidence
-    if null_count >= 2:
-        confidence = 0.4 + (non_null / _TOTAL) * 0.4
-    else:
-        confidence = 0.6 + (non_null / _TOTAL) * 0.4
-
-    confidence = round(min(1.0, max(0.0, confidence)), 4)
+    # Confidence: proportion of total weight that was actually measured
+    confidence = round(measured_weight, 4)
 
     # Tiering
     if score >= 70:
@@ -237,7 +241,7 @@ def score_lead(subscores: Subscores) -> tuple[float, str, float]:
     else:
         tier = "cold"
 
-    # Cap tier at "warm" when >= 2 null subscores
+    # Cap tier at "warm" when >= 2 null subscores (lower confidence)
     if null_count >= 2 and tier == "hot":
         tier = "warm"
 
