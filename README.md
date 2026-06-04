@@ -33,14 +33,18 @@ Then open `.env` and set:
 
 ```
 PAGESPEED_API_KEY=your_key_here
+GOOGLE_PLACES_API_KEY=your_key_here
 ```
 
-> **PageSpeed API key** — ask the team for the shared key, or create your own for free:
-> 1. Go to [console.cloud.google.com](https://console.cloud.google.com)
-> 2. Create a project (or select an existing one)
-> 3. Search for **PageSpeed Insights API** and enable it
-> 4. Go to **Credentials** → **Create credentials** → **API key**
-> 5. Paste the key into `.env`
+Both keys come from the same Google Cloud project:
+1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+2. Create a project (or select an existing one)
+3. Enable these two APIs: **PageSpeed Insights API** and **Places API (New)**
+4. Go to **Credentials** → **Create credentials** → **API key**
+5. You can use the same key for both — paste it into `.env` twice
+
+> The PageSpeed key unlocks mobile + performance scoring (35% of the rubric).
+> The Places key powers Step 1 — finding businesses by city + industry via Google Maps.
 
 The other keys (`GATEWAY_API_KEY`, `BUILTWITH_API_KEY`) are optional — the agent runs without them, just with lower signal coverage.
 

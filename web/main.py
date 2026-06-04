@@ -11,17 +11,34 @@ import re
 import uuid
 from typing import Optional
 
-from fastapi import FastAPI, File, Form, UploadFile
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 from lyvica.agent import LyvicaAgent, _to_domain
+from lyvica.config import settings
 from lyvica.models import JobRequest
+from web.sourcer import INDUSTRY_GROUPS, INDUSTRY_MAP, search_businesses
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Lyvica", docs_url=None, redoc_url=None)
 
 DEMO_CAP = 30  # max domains per job on the hosted demo
+
+# ---------------------------------------------------------------------------
+# Build industry <optgroup> HTML from the sourcer data at import time
+# ---------------------------------------------------------------------------
+
+def _industry_options_html() -> str:
+    parts = ['<option value="">— pick an industry —</option>']
+    for group_label, items in INDUSTRY_GROUPS:
+        parts.append(f'<optgroup label="{group_label}">')
+        for display, query in items:
+            parts.append(f'<option value="{query}">{display}</option>')
+        parts.append('</optgroup>')
+    return "\n".join(parts)
+
+_INDUSTRY_OPTIONS = _industry_options_html()
 
 # ---------------------------------------------------------------------------
 # HTML (single-file, no build step)
@@ -58,16 +75,84 @@ _HTML = """<!DOCTYPE html>
       <h1 class="text-3xl font-bold tracking-tight">Lyvica</h1>
     </div>
     <p class="text-indigo-200 text-sm font-medium uppercase tracking-widest">Website Rebuild Opportunity Scorer</p>
-    <p class="text-indigo-300 text-sm mt-3">Paste domains or upload a CSV — we score each site for how ripe it is for a rebuild.</p>
+    <p class="text-indigo-300 text-sm mt-3">Find outdated business websites, score them, and build your sales pipeline.</p>
   </div>
 </div>
 
 <!-- Main -->
 <div class="max-w-4xl mx-auto px-4 py-8 space-y-6">
 
-  <!-- Input card -->
+  <!-- Step 1: Source card -->
   <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-    <div class="border-b border-slate-100">
+    <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+      <div>
+        <span class="text-xs font-semibold uppercase tracking-widest text-indigo-500">Step 1</span>
+        <h2 class="text-sm font-semibold text-slate-700 mt-0.5">Find businesses via Google Maps</h2>
+      </div>
+      <span class="text-xs text-slate-400">Needs a Google Places API key</span>
+    </div>
+    <div class="p-6 space-y-4">
+      <div class="flex flex-wrap gap-4">
+        <div class="flex-1 min-w-[180px]">
+          <label class="block text-xs font-medium text-slate-500 mb-1">City or area</label>
+          <input id="source-city" type="text" placeholder="e.g. San Jose, CA"
+            class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+        </div>
+        <div class="flex-1 min-w-[200px]">
+          <label class="block text-xs font-medium text-slate-500 mb-1">Industry</label>
+          <select id="source-industry"
+            class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+            """ + _INDUSTRY_OPTIONS + """
+          </select>
+        </div>
+        <div class="w-28">
+          <label class="block text-xs font-medium text-slate-500 mb-1">Max results</label>
+          <select id="source-max"
+            class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+            <option value="20">20</option>
+            <option value="40" selected>40</option>
+            <option value="60">60</option>
+          </select>
+        </div>
+      </div>
+      <button id="source-btn" onclick="findBusinesses()"
+        class="px-5 py-2 bg-slate-700 hover:bg-slate-800 text-white text-sm font-semibold rounded-lg shadow transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+        Find Businesses
+      </button>
+
+      <!-- Source results -->
+      <div id="source-results" class="hidden space-y-3">
+        <div class="flex items-center justify-between">
+          <p id="source-summary" class="text-sm font-medium text-slate-700"></p>
+          <button id="score-sourced-btn" onclick="scoreSourced()"
+            class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow transition-colors">
+            Score these →
+          </button>
+        </div>
+        <div class="border border-slate-100 rounded-xl overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide">
+                <th class="px-4 py-2 text-left">Business</th>
+                <th class="px-4 py-2 text-left">Address</th>
+                <th class="px-4 py-2 text-left">Website</th>
+                <th class="px-4 py-2 text-center">Rating</th>
+              </tr>
+            </thead>
+            <tbody id="source-body" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="source-error" class="hidden text-sm text-red-600 bg-red-50 rounded-lg px-4 py-3"></div>
+    </div>
+  </div>
+
+  <!-- Step 2: Score card -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="px-6 pt-4 pb-0">
+      <span class="text-xs font-semibold uppercase tracking-widest text-indigo-500">Step 2 — Score</span>
+    </div>
+    <div class="border-b border-slate-100 mt-2">
       <div class="flex">
         <button id="tab-paste" onclick="switchTab('paste')"
           class="px-6 py-3 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600 focus:outline-none">
@@ -203,9 +288,99 @@ _HTML = """<!DOCTYPE html>
 
 <script>
   let activeTab = 'paste';
-  let allLeads = [];      // all scored leads, unfiltered
+  let allLeads = [];
   let completed = 0;
   let total = 0;
+  let sourcedDomains = [];  // domains found via Places API
+
+  // ---------------------------------------------------------------------------
+  // Step 1: Source businesses via Google Places
+  // ---------------------------------------------------------------------------
+
+  async function findBusinesses() {
+    const city = document.getElementById('source-city').value.trim();
+    const industry = document.getElementById('source-industry').value;
+    const maxResults = document.getElementById('source-max').value;
+
+    if (!city) { showSourceError('Please enter a city or area.'); return; }
+    if (!industry) { showSourceError('Please select an industry.'); return; }
+
+    const btn = document.getElementById('source-btn');
+    btn.disabled = true;
+    btn.textContent = 'Searching…';
+    document.getElementById('source-results').classList.add('hidden');
+    document.getElementById('source-error').classList.add('hidden');
+
+    try {
+      const fd = new FormData();
+      fd.append('city', city);
+      fd.append('industry', industry);
+      fd.append('max_results', maxResults);
+
+      const resp = await fetch('/api/source', { method: 'POST', body: fd });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail || 'Search failed');
+      }
+      const data = await resp.json();
+      renderSourceResults(data.businesses, data.query);
+    } catch (err) {
+      showSourceError(err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Find Businesses';
+    }
+  }
+
+  function renderSourceResults(businesses, query) {
+    sourcedDomains = businesses.filter(b => b.has_website).map(b => b.domain);
+    const withSite = sourcedDomains.length;
+    const total = businesses.length;
+
+    document.getElementById('source-summary').textContent =
+      `Found ${total} businesses for "${query}" — ${withSite} have a website`;
+
+    const scoreBtn = document.getElementById('score-sourced-btn');
+    scoreBtn.textContent = `Score these ${withSite} websites →`;
+    scoreBtn.disabled = withSite === 0;
+
+    const tbody = document.getElementById('source-body');
+    tbody.innerHTML = '';
+    businesses.forEach(b => {
+      const tr = document.createElement('tr');
+      tr.className = 'hover:bg-slate-50 ' + (b.has_website ? '' : 'opacity-50');
+      const rating = b.rating ? `⭐ ${b.rating} (${b.reviews})` : '—';
+      const siteCell = b.website
+        ? `<a href="${b.website}" target="_blank" rel="noopener" class="text-indigo-600 hover:underline break-all text-xs">${b.domain}</a>`
+        : '<span class="text-slate-300 text-xs">no website</span>';
+      tr.innerHTML = `
+        <td class="px-4 py-2 font-medium text-slate-700 text-xs">${b.name}</td>
+        <td class="px-4 py-2 text-slate-500 text-xs">${b.address}</td>
+        <td class="px-4 py-2">${siteCell}</td>
+        <td class="px-4 py-2 text-center text-xs text-slate-500">${rating}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('source-results').classList.remove('hidden');
+  }
+
+  function scoreSourced() {
+    if (!sourcedDomains.length) return;
+    // Populate the paste textarea and switch to Step 2
+    document.getElementById('domains-text').value = sourcedDomains.join('\\n');
+    updateCount();
+    switchTab('paste');
+    // Scroll to score section and start automatically
+    document.getElementById('score-btn').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(startScoring, 400);
+  }
+
+  function showSourceError(msg) {
+    const el = document.getElementById('source-error');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
 
   function switchTab(tab) {
     activeTab = tab;
@@ -438,6 +613,33 @@ _HTML = """<!DOCTYPE html>
 @app.get("/", response_class=HTMLResponse)
 async def index() -> HTMLResponse:
     return HTMLResponse(_HTML)
+
+
+@app.post("/api/source")
+async def source_businesses_endpoint(
+    city: str = Form(...),
+    industry: str = Form(...),
+    max_results: int = Form(40),
+) -> JSONResponse:
+    """Find businesses via Google Places and return them as JSON."""
+    api_key = settings.google_places_api_key
+    if not api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="GOOGLE_PLACES_API_KEY is not configured. Add it in your Render environment variables.",
+        )
+    businesses = await search_businesses(
+        city=city.strip(),
+        industry_query=industry.strip(),
+        api_key=api_key,
+        max_results=min(max_results, 60),
+    )
+    return JSONResponse({
+        "businesses": businesses,
+        "query": f"{industry} in {city}",
+        "total": len(businesses),
+        "with_website": sum(1 for b in businesses if b["has_website"]),
+    })
 
 
 @app.post("/api/score")
