@@ -202,9 +202,9 @@ _HTML = """<!DOCTYPE html>
       <div class="flex flex-wrap items-center gap-6 pt-2">
         <div class="flex-1 min-w-[180px]">
           <label class="block text-xs font-medium text-slate-500 mb-1">
-            Min score to include: <span id="score-val" class="text-indigo-600 font-semibold">50</span>
+            Min score to include: <span id="score-val" class="text-indigo-600 font-semibold">40</span>
           </label>
-          <input type="range" id="min-score" min="0" max="100" value="50" step="5"
+          <input type="range" id="min-score" min="0" max="100" value="40" step="5"
             class="w-full accent-indigo-600"
             oninput="document.getElementById('score-val').textContent = this.value; renderTable();" />
         </div>
@@ -658,7 +658,7 @@ async def source_businesses_endpoint(
 async def score_domains(
     csv_file: Optional[UploadFile] = File(None),
     domains_text: Optional[str] = Form(None),
-    min_score: int = Form(50),
+    min_score: int = Form(40),
     concurrency: int = Form(3),
 ) -> StreamingResponse:
     """
