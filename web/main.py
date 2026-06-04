@@ -635,12 +635,17 @@ async def source_businesses_endpoint(
             status_code=400,
             detail="GOOGLE_PLACES_API_KEY is not configured. Add it in your Render environment variables.",
         )
-    businesses = await search_businesses(
-        city=city.strip(),
-        industry_query=industry.strip(),
-        api_key=api_key,
-        max_results=min(max_results, 60),
-    )
+    try:
+        businesses = await search_businesses(
+            city=city.strip(),
+            industry_query=industry.strip(),
+            api_key=api_key,
+            max_results=min(max_results, 60),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Search failed: {exc}")
     return JSONResponse({
         "businesses": businesses,
         "query": f"{industry} in {city}",

@@ -122,11 +122,12 @@ async def search_businesses(
                 resp.raise_for_status()
                 data = resp.json()
             except httpx.HTTPStatusError as exc:
-                logger.error("Places API error %s: %s", exc.response.status_code, exc.response.text[:300])
-                break
+                msg = exc.response.text[:400]
+                logger.error("Places API error %s: %s", exc.response.status_code, msg)
+                raise ValueError(f"Google Places API error {exc.response.status_code}: {msg}") from exc
             except Exception as exc:
                 logger.error("Places API request failed: %s", exc)
-                break
+                raise
 
             for place in data.get("places", []):
                 website = place.get("websiteUri")
